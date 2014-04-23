@@ -17,5 +17,23 @@ int main(void)
 
     int listenfd = tcp_server(NULL, 5188);
     int conn;
-    
+    pid_t pid;
+
+    while(1)
+    {
+        conn = accept_timeout(listenfd, NULL, 0);
+        if(conn == -1)
+            ERR_EXIT("accept_timeout");
+
+        pid = fork();
+        if(pid == 0)
+        {
+            close(listenfd);
+            sess.ctrl_fd = conn;
+            begin_session(&sess);
+        }else
+            close(conn);
+    }
+
+    return 0;
 }

@@ -8,12 +8,12 @@ typedef struct session
     int ctrl_fd;
     char cmdline[MAX_COMMAND_LINE];
     char cmd[MAX_COMMAND];
-    char arg[MAX_ARGS];
+    char arg[MAX_ARG];
 
     int parent_fd;
     int child_fd;
 } session_t;
 
-void begin_seeion(session_t* sess);
+void begin_session(session_t* sess);
 
 #endif
