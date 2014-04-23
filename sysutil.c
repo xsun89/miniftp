@@ -1,48 +1,44 @@
 #include "sysutil.h"
 
-/**
- * tcp_server - 启动tcp服务器
- * @host: 服务器IP地址或者服务器主机名
- * @port: 服务器端口
- * 成功返回监听套接字
- */
 int tcp_server(const char *host, unsigned short port)
 {
-	int listenfd;
-	if ((listenfd = socket(PF_INET, SOCK_STREAM, 0)) < 0)
-		ERR_EXIT("tcp_server");
+    int listenfd;
+    if((listenfd = socket(PF_INET, SOCK_STREAM, 0) < 0))
+    {
+        ERR_EXIT("tcp_server");
+    }
 
-	struct sockaddr_in servaddr;
-	memset(&servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	if (host != NULL)
-	{
-		if (inet_aton(host, &servaddr.sin_addr) == 0)
-		{
-			struct hostent *hp;
-			hp = gethostbyname(host);
-			if (hp == NULL)
-				ERR_EXIT("gethostbyname");
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    if(host != NULL)
+    {
+        if(inet_aton(host, &servaddr.sin_addr) == 0)
+        {
+            struct hostent *hp;
+            hp = gethostbyname(host);
+            if(hp == NULL)
+                ERR_EXIT("gethostname");
 
-			servaddr.sin_addr = *(struct in_addr*)hp->h_addr;
-		}
-	}
-	else
-		servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+            servaddr.sin_addr = *(struct in_addr*)hp->h_addr;
+        }
+    }else
+    {
+        servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
 
-	servaddr.sin_port = htons(port);
+    servaddr.sin_port = htons(port);
+    int on = 1;
+    if((setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on))) < 0)
+        ERR_EXIT("setsockopt");
 
-	int on = 1;
-	if ((setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on))) < 0)
-		ERR_EXIT("gethostbyname");
+    if(bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0)
+        ERR_EXIT("bind");
 
-	if (bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) < 0)
-		ERR_EXIT("bind");
+    if(listen(listenfd, SOMAXCONN) < 0)
+        ERR_EXIT("listen");
 
-	if (listen(listenfd, SOMAXCONN) < 0)
-		ERR_EXIT("listen");
-
-	return listenfd;
+    return listenfd;
 }
 
 int getlocalip(char *ip)
@@ -459,7 +455,7 @@ int recv_fd(const int sock_fd)
 	msg.msg_flags = 0;
 
 	p_fd = (int*)CMSG_DATA(CMSG_FIRSTHDR(&msg));
-	*p_fd = -1;  
+	*p_fd = -1;
 	ret = recvmsg(sock_fd, &msg, 0);
 	if (ret != 1)
 		ERR_EXIT("recvmsg");
