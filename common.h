@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
+#include <shadow.h>
+#include <crypt.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -11,7 +13,10 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <ctype.h>
-
+#include <time.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <sys/time.h>
 
 #include <stdlib.h>
 #include <stdio.h>

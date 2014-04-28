@@ -33,11 +33,13 @@ int main(void)
     }
 
     session_t sess = {
-        -1, "", "", "",
-        -1, -1
+        0, -1, "", "", "",
+        NULL, -1,
+        -1, -1,
+        0
     };
 
-    int listenfd = tcp_server(NULL, 5188);
+    int listenfd = tcp_server(tunable_listen_address, tunable_listen_port);
     int conn;
     pid_t pid;
 

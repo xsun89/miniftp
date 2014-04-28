@@ -9,7 +9,7 @@ typedef struct parseconf_bool_setting
     int *p_variable;
 } PARSECONF_BOOL;
 
-PARSECONF_BOOL parseconf_bool_array[] = {
+static PARSECONF_BOOL parseconf_bool_array[] = {
     {"pasv_enable", &tunable_pasv_enable},
     {"port_enable", &tunable_port_enable},
     {NULL, NULL}
@@ -20,7 +20,7 @@ typedef struct parseconf_uint_setting
 	const char *p_setting_name;
 	unsigned int *p_variable;
 } PARSECONF_UINT;
-PARSECONF_UINT parseconf_uint_array[] =
+static PARSECONF_UINT parseconf_uint_array[] =
 {
 	{ "listen_port", &tunable_listen_port },
 	{ "max_clients", &tunable_max_clients },
@@ -39,7 +39,7 @@ typedef struct parseconf_str_setting
 	const char *p_setting_name;
 	const char **p_variable;
 } PARSECONF_STR;
-PARSECONF_STR parseconf_str_array[] =
+static PARSECONF_STR parseconf_str_array[] =
 {
 	{ "listen_address", &tunable_listen_address },
 	{NULL, NULL}
@@ -58,7 +58,6 @@ void parseconf_load_file(const char *path)
             continue;
 
         str_trim_crlf(setting_line);
-        printf("handle setting line%s \n", setting_line);
         parseconf_load_setting(setting_line);
         memset(setting_line, 0, sizeof(setting_line));
     }

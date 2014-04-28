@@ -1,9 +1,31 @@
 #include "sysutil.h"
 
+int tcp_client(unsigned short port)
+{
+    int sock;
+    if((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)
+        ERR_EXIT("tcp_client");
+
+    if(port > 0)
+    {
+        char ip[16] = {0};
+        getlocalip(ip);
+        struct sockaddr_in localaddr;
+        memset(&localaddr, 0, sizeof(localaddr));
+        localaddr.sin_family = AF_INET;
+        localaddr.sin_port = htons(port);
+        localaddr.sin_addr.s_addr = inet_addr(ip);
+        if(bind(sock, (struct sockaddr*)&localaddr, sizeof(localaddr)) < 0)
+            ERR_EXIT("bind");
+    }
+
+    return sock;
+}
+
 int tcp_server(const char *host, unsigned short port)
 {
     int listenfd;
-    if((listenfd = socket(PF_INET, SOCK_STREAM, 0) < 0))
+    if((listenfd = socket(PF_INET, SOCK_STREAM, 0)) < 0)
     {
         ERR_EXIT("tcp_server");
     }
