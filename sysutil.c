@@ -1,4 +1,5 @@
 #include "sysutil.h"
+#include "tunable.h"
 
 int tcp_client(unsigned short port)
 {

@@ -34,7 +34,7 @@ int main(void)
 
     session_t sess = {
         0, -1, "", "", "",
-        NULL, -1,
+        NULL, -1, -1,
         -1, -1,
         0
     };

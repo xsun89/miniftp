@@ -248,7 +248,7 @@ int list_common(session_t *sess)
         char buf[1024] = {0};
         int off = 0;
         off += sprintf(buf, "%s", perms);
-        off += sprintf(buf+off, "%3d %-8d %-8d ", sbuf.st_nlink, sbuf.st_uid, sbuf.st_gid);
+        off += sprintf(buf+off, "%3d %-8d %-8d ", (int)sbuf.st_nlink, sbuf.st_uid, sbuf.st_gid);
         off += sprintf(buf+off, "%8lu ", (unsigned long)sbuf.st_size);
         const char *p_date_format = "%b %e %H:%M";
         struct timeval tv;
@@ -284,21 +284,38 @@ int list_common(session_t *sess)
 int port_active(session_t *sess)
 {
     if(sess->port_addr)
+    {
+        if(pasv_active(sess))
+        {
+            fprintf(stderr, "both port an pasv are active");
+			exit(EXIT_FAILURE);
+        }
         return 1;
-
+    }
     return 0;
 }
 
 int pasv_active(session_t *sess)
 {
+    if(sess->pasv_listen_fd != -1)
+    {
+        if(port_active(sess))
+        {
+            fprintf(stderr, "both port an pasv are active");
+			exit(EXIT_FAILURE);
+        }
+        return 1;
+    }
     return 0;
 }
 
 int get_transfer_fd(session_t *sess)
 {
     if(!port_active(sess) && !pasv_active(sess))
+    {
+        ftp_reply(sess, FTP_BADSENDCONN, "Use PORT or PASV first.");
         return 0;
-
+    }
     if(port_active(sess))
     {
         int fd = tcp_client(0);
@@ -308,6 +325,16 @@ int get_transfer_fd(session_t *sess)
             return 0;
         }
 
+        sess->data_fd = fd;
+    }
+
+    if(pasv_active(sess))
+    {
+        int fd = accept_timeout(sess->pasv_listen_fd, NULL, tunable_accept_timeout);
+        close(sess->pasv_listen_fd);
+        if(fd == -1)
+            return 0;
+        sess->pasv_listen_fd = -1;
         sess->data_fd = fd;
     }
 
@@ -338,14 +365,14 @@ static void do_pass(session_t *sess)
     struct passwd *pw = getpwuid(sess->uid);
     if(pw == NULL)
     {
-        ftp_reply(sess, FTP_LOGINERR, "1Login incorrect.");
+        ftp_reply(sess, FTP_LOGINERR, "Login incorrect.");
         return;
     }
 
     struct spwd *sp = getspnam(pw->pw_name);
     if(sp == NULL)
     {
-        ftp_reply(sess, FTP_LOGINERR, "2Login incorrect.");
+        ftp_reply(sess, FTP_LOGINERR, "Login incorrect.");
         return;
     }
 
@@ -396,6 +423,21 @@ static void do_port(session_t *sess)
 
 static void do_pasv(session_t *sess)
 {
+    char ip[16] = {0};
+    getlocalip(ip);
+    sess->pasv_listen_fd = tcp_server(ip, 0);
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    if(getsockname(sess->pasv_listen_fd, (struct sockaddr *)&addr, &addrlen) < 0)
+        ERR_EXIT("getsockname");
+
+    unsigned short port = ntohs(addr.sin_port);
+    unsigned int v[4];
+    sscanf(ip, "%u.%u.%u.%u", &v[0], &v[1], &v[2], &v[3]);
+    char text[1024] = {0};
+    sprintf(text, "Entering Passive Mode (%u,%u,%u,%u,%u,%u).",
+        v[0], v[1], v[2], v[3], port>>8, port&0xFF);
+    ftp_reply(sess, FTP_PASVOK, text);
 }
 
 static void do_type(session_t *sess)
@@ -445,6 +487,7 @@ static void do_list(session_t *sess)
     ftp_lreply(sess, FTP_DATACONN, "Here comes the directory listing.");
     list_common(sess);
     close(sess->data_fd);
+    sess->data_fd = -1;
     ftp_reply(sess, FTP_TRANSFEROK, "Directory send OK.");
 }
 
