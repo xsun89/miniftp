@@ -12,6 +12,7 @@ typedef struct session
     char arg[MAX_ARG];
 
     struct sockaddr_in *port_addr;
+    int pasv_listen_fd;
     int data_fd;
     
     int parent_fd;

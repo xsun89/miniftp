@@ -425,7 +425,7 @@ static void do_pasv(session_t *sess)
 {
     char ip[16] = {0};
     getlocalip(ip);
-    sess->pasv_listen_fd = tcp_server(ip, 0);
+    sess->pasv_listen_fd = tcp_server(tunable_listen_address, 0);
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
     if(getsockname(sess->pasv_listen_fd, (struct sockaddr *)&addr, &addrlen) < 0)
@@ -433,7 +433,7 @@ static void do_pasv(session_t *sess)
 
     unsigned short port = ntohs(addr.sin_port);
     unsigned int v[4];
-    sscanf(ip, "%u.%u.%u.%u", &v[0], &v[1], &v[2], &v[3]);
+    sscanf(tunable_listen_address, "%u.%u.%u.%u", &v[0], &v[1], &v[2], &v[3]);
     char text[1024] = {0};
     sprintf(text, "Entering Passive Mode (%u,%u,%u,%u,%u,%u).",
         v[0], v[1], v[2], v[3], port>>8, port&0xFF);
