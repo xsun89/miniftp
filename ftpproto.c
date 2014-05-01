@@ -280,6 +280,7 @@ int get_transfer_fd(session_t *sess)
     {
         if(get_port_fd(sess) == 0)
         {
+            printf("get_port_fd return 0\n");
             ret = 0;
         }
     }
@@ -287,7 +288,10 @@ int get_transfer_fd(session_t *sess)
     if(pasv_active(sess))
     {
         if(get_pasv_fd(sess) == 0)
+        {
+            printf("get_pasv_fd return 0\n");
             ret = 0;
+        }
     }
 
     if(sess->port_addr)
@@ -381,7 +385,7 @@ static void do_pasv(session_t *sess)
     unsigned short port = (int)priv_sock_get_int(sess->child_fd);
     
     unsigned int v[4];
-    sscanf(tunable_listen_address, "%u.%u.%u.%u", &v[0], &v[1], &v[2], &v[3]);
+    sscanf(ip, "%u.%u.%u.%u", &v[0], &v[1], &v[2], &v[3]);
     char text[1024] = {0};
     sprintf(text, "Entering Passive Mode (%u,%u,%u,%u,%u,%u).",
         v[0], v[1], v[2], v[3], port>>8, port&0xFF);

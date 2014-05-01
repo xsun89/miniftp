@@ -69,6 +69,7 @@ static void privop_pasv_get_data_sock(session_t *sess)
     unsigned short port = (unsigned short)priv_sock_get_int(sess->parent_fd);
     char ip[16] = {0};
     priv_sock_recv_buf(sess->parent_fd, ip, sizeof(ip));
+    printf("privop_pasv_get_data_sock port=%u and ip=%s\n", port, ip);
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -78,14 +79,18 @@ static void privop_pasv_get_data_sock(session_t *sess)
     int fd = tcp_client(20);
     if(fd == -1)
     {
+        printf("aaaaaaaaaaaaaaaaaaa\n");
         priv_sock_send_result(sess->parent_fd, PRIV_SOCK_RESULT_BAD);
         return;
     }
-
-    if(connect_timeout(fd, &addr, tunable_connect_timeout) < 0)
+    socklen_t len = sizeof(struct sockaddr_in);;
+    if(connect(fd, (struct sockaddr*)&addr, len) < 0)
     {
+        printf("bbbbbbbbbbbbbbbbb\n");
+        ERR_EXIT("ccccconect");
         close(fd);
         priv_sock_send_result(sess->parent_fd, PRIV_SOCK_RESULT_BAD);
+        ERR_EXIT("connect");
         return;
     }
 
@@ -111,7 +116,7 @@ static void privop_pasv_listen(session_t *sess)
     char ip[16];
     getlocalip(ip);
 
-    sess->pasv_listen_fd = tcp_server(tunable_listen_address, 0);
+    sess->pasv_listen_fd = tcp_server(ip, 0);
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
     if(getsockname(sess->pasv_listen_fd, (struct sockaddr *)&addr, &addrlen) < 0)
