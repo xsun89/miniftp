@@ -452,7 +452,80 @@ static void do_retr(session_t *sess)
         ftp_reply(sess, FTP_FILEFAIL, "Failed to open file.");
 		return;
     }
-    
+    struct stat sbuf;
+    ret = fstat(fd, &sbuf);
+    if(!S_ISREG(sbuf.st_mode))
+    {
+        ftp_reply(sess, FTP_FILEFAIL, "Failed to open file.");
+		return;
+    }
+
+    if(offset != 0)
+    {
+        ret = lseek(fd, offset, SEEK_SET);
+        if(ret == -1)
+        {
+            ftp_reply(sess, FTP_FILEFAIL, "Failed to open file.");
+            return;
+        }
+    }
+
+    char text[1024] = {0};
+    if(sess->is_ascii)
+    {
+        sprintf(text, "opening ASCII mode data connection for %s (%lld bytes).",
+            sess->arg, (long long)sbuf.st_size);
+    }else
+    {
+        sprintf(text, "Opening BINARY mode data connection for %s (%lld bytes).",
+			sess->arg, (long long)sbuf.st_size);
+    }
+    ftp_reply(sess, FTP_DATACONN, text);
+
+    int flag = 0;
+    long long bytes_to_send = sbuf.st_size;
+    if(offset > bytes_to_send)
+    {
+        bytes_to_send = 0;
+    }
+    else
+    {
+        bytes_to_send -= offset;
+    }
+
+    while(bytes_to_send)
+    {
+        int num_this_time = bytes_to_send > 4096 ? 4096 : bytes_to_send;
+        ret = sendfile(sess->data_fd, fd, NULL, num_this_time);
+        if(ret == -1)
+        {
+            flag = 2;
+            break;
+        }
+        bytes_to_send -= ret;
+    }
+
+    if(bytes_to_send == 0)
+        flag = 0;
+
+    close(sess->data_fd);
+    sess->data_fd = -1;
+    if(flag == 0)
+    {
+		// 226
+		ftp_reply(sess, FTP_TRANSFEROK, "Transfer complete.");
+	}
+	else if (flag == 1)
+	{
+		// 426
+		ftp_reply(sess, FTP_BADSENDFILE, "Failure reading from local file.");
+	}
+	else if (flag == 2)
+	{
+		// 451
+		ftp_reply(sess, FTP_BADSENDNET, "Failure writting to network stream.");
+	}
+
 }
 
 static void do_stor(session_t *sess)

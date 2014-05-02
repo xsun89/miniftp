@@ -14,6 +14,8 @@
 #include <netdb.h>
 #include <linux/capability.h>
 #include <sys/syscall.h>
+#include <sys/sendfile.h>
+
 #include <ctype.h>
 #include <time.h>
 #include <sys/stat.h>
