@@ -36,7 +36,7 @@ int main(void)
         0, -1, "", "", "",
         NULL, -1, -1,
         -1, -1,
-        0
+        0, 0, NULL
     };
 
     int listenfd = tcp_server(tunable_listen_address, tunable_listen_port);

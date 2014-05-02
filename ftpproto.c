@@ -335,7 +335,7 @@ static void do_pass(session_t *sess)
     char *encrypted_pass = crypt(sess->arg, sp->sp_pwdp);
     if(strcmp(encrypted_pass, sp->sp_pwdp) != 0)
     {
-        ftp_reply(sess, FTP_LOGINERR, "3Login incorrect.");
+        ftp_reply(sess, FTP_LOGINERR, "Login incorrect.");
         return;
     }
 
@@ -346,11 +346,24 @@ static void do_pass(session_t *sess)
 }
 static void do_cwd(session_t *sess)
 {
-    
+    if(chdir(sess->arg) < 0)
+    {
+        ftp_reply(sess, FTP_FILEFAIL, "Failed to change directory.");
+        return;
+    }
+
+    ftp_reply(sess, FTP_CWDOK, "Directory successfully changed.");
 }
 
 static void do_cdup(session_t *sess)
 {
+    if (chdir("..") < 0)
+	{
+		ftp_reply(sess, FTP_FILEFAIL, "Failed to change directory.");
+		return;
+	}
+
+	ftp_reply(sess, FTP_CWDOK, "Directory successfully changed.");
 }
 
 static void do_quit(session_t *sess)
@@ -421,6 +434,25 @@ static void do_mode(session_t *sess)
 
 static void do_retr(session_t *sess)
 {
+    if(get_transfer_fd(sess) == 0)
+        return;
+
+    long long offset = sess->restart_pos;
+    sess->restart_pos = 0;
+    int fd = open(sess->arg, O_RDONLY);
+    if(fd == -1)
+    {
+        ftp_reply(sess, FTP_FILEFAIL, "Failed to open file.");
+		return;
+    }
+    int ret;
+    ret = lock_file_read(fd);
+    if(ret == -1)
+    {
+        ftp_reply(sess, FTP_FILEFAIL, "Failed to open file.");
+		return;
+    }
+    
 }
 
 static void do_stor(session_t *sess)
@@ -474,22 +506,75 @@ static void do_pwd(session_t *sess)
 
 static void do_mkd(session_t *sess)
 {
+    if(mkdir(sess->arg, 0777) < 0)
+    {
+        ftp_reply(sess, FTP_FILEFAIL, "Create directory operation failed.");
+		return;
+    }
+
+    char text[4096] = {0};
+    if(sess->arg[0] == '/')
+    {
+        sprintf(text, "%s created", sess->arg);
+    }
+    else
+    {
+        char dir[4096+1] = {0};
+        getcwd(dir, 4096);
+        if(dir[strlen(dir) -1] == '/')
+        {
+            sprintf(text, "%s%s created", dir, sess->arg);
+        }else
+        {
+            sprintf(text, "%s/%s created", dir, sess->arg);
+        }
+    }
+
+    ftp_reply(sess, FTP_MKDIROK, text);
 }
 
 static void do_rmd(session_t *sess)
 {
+    if (rmdir(sess->arg) < 0)
+	{
+		ftp_reply(sess, FTP_FILEFAIL, "Remove directory operation failed.");
+	}
+
+	ftp_reply(sess, FTP_RMDIROK, "Remove directory operation successful.");
 }
 
 static void do_dele(session_t *sess)
 {
+    if (unlink(sess->arg) < 0)
+	{
+		ftp_reply(sess, FTP_FILEFAIL, "Delete operation failed.");
+		return;
+	}
+
+	ftp_reply(sess, FTP_DELEOK, "Delete operation successful.");
 }
 
 static void do_rnfr(session_t *sess)
 {
+    sess->rnfr_name = (char *)malloc(strlen(sess->arg)+1);
+    memset(sess->rnfr_name, 0, strlen(sess->arg) + 1);
+    strcpy(sess->rnfr_name, sess->arg);
+    ftp_reply(sess, FTP_RNFROK, "Ready for RNTO.");
 }
 
 static void do_rnto(session_t *sess)
 {
+    if(sess->rnfr_name == NULL)
+    {
+        ftp_reply(sess, FTP_NEEDRNFR, "RNFR required first.");
+		return;
+    }
+
+    rename(sess->rnfr_name, sess->arg);
+    ftp_reply(sess, FTP_RENAMEOK, "Rename successful.");
+
+    free(sess->rnfr_name);
+    sess->rnfr_name = NULL;
 }
 
 static void do_site(session_t *sess)
@@ -517,6 +602,22 @@ static void do_feat(session_t *sess)
 
 static void do_size(session_t *sess)
 {
+    struct stat buf;
+    if(stat(sess->arg, &buf) < 0)
+    {
+        ftp_reply(sess, FTP_FILEFAIL, "SIZE operation failed.");
+		return;
+    }
+
+    if(!S_ISREG(buf.st_mode))
+    {
+        ftp_reply(sess, FTP_FILEFAIL, "Could not get file size.");
+		return;
+    }
+
+    char text[1024] = {0};
+    sprintf(text, "%lld", (long long)buf.st_size);
+    ftp_reply(sess, FTP_SIZEOK, text);
 }
 
 static void do_stat(session_t *sess)

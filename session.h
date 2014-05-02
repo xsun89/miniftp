@@ -18,6 +18,8 @@ typedef struct session
     int parent_fd;
     int child_fd;
     int is_ascii;
+    long long restart_pos;
+    char *rnfr_name;
 } session_t;
 
 void begin_session(session_t* sess);

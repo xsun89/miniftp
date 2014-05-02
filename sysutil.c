@@ -67,7 +67,6 @@ int tcp_server(const char *host, unsigned short port)
 
 int getlocalip(char *ip)
 {
-	sizeof(struct sockaddr_in);
     const char* google_dns_server = "8.8.8.8";
     int dns_port = 53;
     struct sockaddr_in serv;
@@ -82,9 +81,13 @@ int getlocalip(char *ip)
     serv.sin_addr.s_addr = inet_addr( google_dns_server );
     serv.sin_port = htons( dns_port );
     int err = connect( sock , (const struct sockaddr*) &serv , sizeof(serv) );
+    if(err == -1)
+        ERR_EXIT("connect");
     struct sockaddr_in name;
     socklen_t namelen = sizeof(name);
     err = getsockname(sock, (struct sockaddr*) &name, &namelen);
+    if(err == -1)
+        ERR_EXIT("getsockname");
     char buffer[100];
     const char* p = inet_ntop(AF_INET, &name.sin_addr, buffer, 100);
     if(p != NULL)
@@ -615,4 +618,22 @@ const char* statbuf_get_date(struct stat *sbuf)
     strftime(datebuf, sizeof(datebuf), p_date_format, p_tm);
 
     return datebuf;
+}
+
+int lock_file_read(int fd)
+{
+    int ret;
+    struct flock the_lock;
+    memset(&the_lock, 0, sizeof(the_lock));
+    the_lock.l_len = 0;
+    the_lock.l_start = 0;
+    the_lock.l_whence = SEEK_SET;
+    the_lock.l_type = F_RDLCK;
+
+    do
+    {
+        ret = fcntl(fd, F_SETLKW, &the_lock);
+    }while(ret < 0 && errno == EINTR);
+
+    return ret;
 }
