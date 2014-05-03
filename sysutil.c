@@ -619,8 +619,7 @@ const char* statbuf_get_date(struct stat *sbuf)
 
     return datebuf;
 }
-
-int lock_file_read(int fd)
+static int lock_internal(int fd, int lock_type)
 {
     int ret;
     struct flock the_lock;
@@ -628,7 +627,7 @@ int lock_file_read(int fd)
     the_lock.l_len = 0;
     the_lock.l_start = 0;
     the_lock.l_whence = SEEK_SET;
-    the_lock.l_type = F_RDLCK;
+    the_lock.l_type = lock_type;
 
     do
     {
@@ -637,3 +636,30 @@ int lock_file_read(int fd)
 
     return ret;
 }
+
+int lock_file_read(int fd)
+{
+    return lock_internal(fd, F_RDLCK);
+}
+
+int lock_file_write(int fd)
+{
+    return lock_internal(fd, F_WRLCK);
+}
+
+int unlock_file(int fd)
+{
+    int ret;
+	struct flock the_lock;
+	memset(&the_lock, 0, sizeof(the_lock));
+	the_lock.l_type = F_UNLCK;
+	the_lock.l_whence = SEEK_SET;
+	the_lock.l_start = 0;
+	the_lock.l_len = 0;
+
+	ret = fcntl(fd, F_SETLK, &the_lock);
+
+	return ret;
+}
+
+
