@@ -4,6 +4,8 @@
 #include "tunable.h"
 #include "parseconf.h"
 
+extern session_t *p_sess;
+
 int main(void)
 {
     parseconf_load_file(MINIFTP_CONF);
@@ -34,11 +36,17 @@ int main(void)
 
     session_t sess = {
         0, -1, "", "", "",
-        NULL, -1, -1,
+        NULL, -1, -1, 0,
+        0, 0, 0, 0,
         -1, -1,
-        0, 0, NULL
+        0, 0, NULL, 0
     };
+    p_sess = &sess;
+    //printf("bbbbbbbbbbbbbbbbbbbbb\n");
+    sess.bw_download_rate_max = tunable_download_max_rate;
+    sess.bw_upload_rate_max = tunable_download_max_rate;
 
+    signal(SIGCHLD, SIG_IGN);
     int listenfd = tcp_server(tunable_listen_address, tunable_listen_port);
     int conn;
     pid_t pid;

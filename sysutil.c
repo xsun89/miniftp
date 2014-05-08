@@ -662,4 +662,50 @@ int unlock_file(int fd)
 	return ret;
 }
 
+void get_current_time(long* sec, long* usec)
+{
+    struct timeval curr_time;
+    if(gettimeofday(&curr_time, NULL) < -1)
+    {
+        ERR_EXIT("gettimeofday");
+    }
+
+    *sec = curr_time.tv_sec;
+    *usec = curr_time.tv_usec;
+}
+
+void nano_sleep(double seconds)
+{
+    time_t secs = (time_t)seconds;
+    double fractional = seconds - (double)secs;
+
+    struct timespec ts;
+    ts.tv_sec = secs;
+    ts.tv_nsec =(long) (fractional * (double)1000000000);
+
+    int ret;
+    do
+    {
+        ret = nanosleep(&ts, &ts);
+    }while(ret == -1 && errno == EINTR);
+}
+
+void activate_oobinline(int fd)
+{
+    int oob_inline = 1;
+    int ret;
+    ret = setsockopt(fd, SOL_SOCKET, SO_OOBINLINE, &oob_inline, sizeof(oob_inline));
+    if(ret == -1)
+    {
+        ERR_EXIT("setsockopt");
+    }
+}
+
+void activate_sigurg(int fd)
+{
+    int ret;
+    ret = fcntl(fd, F_SETOWN, getpid());
+    if(ret == -1)
+        ERR_EXIT("fcntl");
+}
 
