@@ -27,6 +27,7 @@ typedef struct session
     long long restart_pos;
     char *rnfr_name;
     int abor_received;
+    unsigned int num_clients;
 } session_t;
 
 void begin_session(session_t* sess);
