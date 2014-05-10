@@ -5,11 +5,18 @@
 #include "parseconf.h"
 #include "ftpproto.h"
 #include "ftpcodes.h"
+#include "hash.h"
 
 extern session_t *p_sess;
 static unsigned int s_children;
+static hash_t *s_ip_count_hash;
+static hash_t *s_pid_ip_hash;
+
 void check_limits(session_t *sess);
 void handle_sigchld(int sig);
+void handle_ip_count(unsigned int *ip);
+unsigned int hash_func(unsigned int buckets, void *key);
+void drop_ip_count(void *ip);
 int main(void)
 {
     parseconf_load_file(MINIFTP_CONF);
@@ -44,9 +51,11 @@ int main(void)
         0, 0, 0, 0,
         -1, -1,
         0, 0, NULL, 0,
-        0
+        0, 0
     };
     p_sess = &sess;
+    s_ip_count_hash = hash_alloc(256, hash_func);
+    s_pid_ip_hash = hash_alloc(256, hash_func);
     //printf("bbbbbbbbbbbbbbbbbbbbb\n");
     sess.bw_download_rate_max = tunable_download_max_rate;
     sess.bw_upload_rate_max = tunable_download_max_rate;
@@ -56,14 +65,17 @@ int main(void)
     int conn;
     pid_t pid;
 
+    struct sockaddr_in addr;
     while(1)
     {
-        conn = accept_timeout(listenfd, NULL, 0);
+        conn = accept_timeout(listenfd, &addr, 0);
         if(conn == -1)
             ERR_EXIT("accept_timeout");
 
+        unsigned int ip = addr.sin_addr.s_addr;
         ++s_children;
         sess.num_clients = s_children;
+        sess.num_this_ip = handle_ip_count(&ip);
         pid = fork();
         if (pid == -1)
 		{
@@ -80,7 +92,10 @@ int main(void)
             signal(SIGCHLD, SIG_IGN);
             begin_session(&sess);
         }else
+        {
+            hash_add_entry(s_pid_ip_hash, &pid, sizeof(pid_t), &ip, sizeof(unsigned int));
             close(conn);
+        }
     }
 
     return 0;
@@ -96,6 +111,13 @@ void check_limits(session_t *sess)
 		exit(EXIT_FAILURE);
 	}
 
+    if (tunable_max_per_ip > 0 && sess->num_this_ip > tunable_max_per_ip)
+	{
+		ftp_reply(sess, FTP_IP_LIMIT, 
+			"There are too many connections from your internet address.");
+
+		exit(EXIT_FAILURE);
+	}
 }
 
 void handle_sigchld(int sig)
@@ -104,5 +126,64 @@ void handle_sigchld(int sig)
     while((pid = waitpid(-1, NULL, WNOHANG)) >0 )
     {
         s_children--;
+        unsigned int *ip = hash_lookup_entry(s_pid_ip_hash, &pid, sizeof(pid));
+        if(ip == NULL)
+            continue;
+
+        drop_ip_count(ip);
+        hash_free_entry(s_pid_ip_hash, &pid, sizeof(pid));
     }
 }
+
+unsigned int hash_func(unsigned int buckets, void *key)
+{
+    unsigned int *number = (unsigned int*)key;
+
+    return (*number) % buckets;
+}
+
+unsigned int handle_ip_count(unsigned int *ip)
+{
+    unsigned int count;
+    unsigned int *p_count = (unsigned int *)hash_lookup_entry(s_ip_count_hash, ip, sizeof(unsigned int));
+    if(p_count == NULL)
+    {
+        count = 1;
+        hash_add_entry(s_ip_count_hash, ip, sizeof(unsigned int), count, sizeof(unsigned int));
+    }else
+    {
+        count = *p_count;
+        count++;
+        *p_count = count;
+    }
+
+    return count;
+}
+
+void drop_ip_count(void *ip)
+{
+    unsigned int count;
+	unsigned int *p_count = (unsigned int *)hash_lookup_entry(s_ip_count_hash,
+		ip, sizeof(unsigned int));
+	if (p_count == NULL)
+	{
+		return;
+	}
+
+	count = *p_count;
+	if (count <= 0)
+	{
+		return;
+	}
+	--count;
+	*p_count = count;
+
+	if (count == 0)
+	{
+		hash_free_entry(s_ip_count_hash, ip, sizeof(unsigned int));
+	}
+}
+
+
+
+

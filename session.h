@@ -28,6 +28,7 @@ typedef struct session
     char *rnfr_name;
     int abor_received;
     unsigned int num_clients;
+    unsigned int num_this_ip;
 } session_t;
 
 void begin_session(session_t* sess);
