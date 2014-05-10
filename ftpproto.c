@@ -19,8 +19,8 @@ static void do_quit(session_t *sess);
 static void do_port(session_t *sess);
 static void do_pasv(session_t *sess);
 static void do_type(session_t *sess);
-static void do_stru(session_t *sess);
-static void do_mode(session_t *sess);
+//static void do_stru(session_t *sess);
+//static void do_mode(session_t *sess);
 static void do_retr(session_t *sess);
 static void do_stor(session_t *sess);
 static void do_appe(session_t *sess);
@@ -43,6 +43,8 @@ static void do_stat(session_t *sess);
 static void do_noop(session_t *sess);
 static void do_help(session_t *sess);
 
+static void do_site_chmod(session_t *sess, char *chmod_arg);
+static void do_site_umask(session_t *sess, char *umask_arg);
 static ftpcmd_t ctrl_cmd[] = {
     {"USER",	do_user	},
 	{"PASS",	do_pass	},
@@ -58,9 +60,10 @@ static ftpcmd_t ctrl_cmd[] = {
 	{"PORT",	do_port	},
 	{"PASV",	do_pasv	},
 	{"TYPE",	do_type	},
+    /*
 	{"STRU",	do_stru	},
 	{"MODE",	do_mode	},
-
+    */
 	/* 服务命令 */
 	{"RETR",	do_retr	},
 	{"STOR",	do_stor	},
@@ -682,7 +685,7 @@ static void do_type(session_t *sess)
 	}
 
 }
-
+/*
 static void do_stru(session_t *sess)
 {
 }
@@ -690,7 +693,7 @@ static void do_stru(session_t *sess)
 static void do_mode(session_t *sess)
 {
 }
-
+*/
 static void do_retr(session_t *sess)
 {
     if(get_transfer_fd(sess) == 0)
@@ -926,6 +929,30 @@ static void do_rnto(session_t *sess)
 
 static void do_site(session_t *sess)
 {
+    // SITE CHMOD <perm> <file>
+	// SITE UMASK [umask]
+	// SITE HELP
+
+	char cmd[100] = {0};
+	char arg[100] = {0};
+
+	str_split(sess->arg ,cmd, arg, ' ');
+	if (strcmp(cmd, "CHMOD") == 0)
+	{
+		do_site_chmod(sess, arg);
+	}
+	else if (strcmp(cmd, "UMASK") == 0)
+	{
+		do_site_umask(sess, arg);
+	}
+	else if (strcmp(cmd, "HELP") == 0)
+	{
+		ftp_reply(sess, FTP_SITEHELP, "CHMOD UMASK HELP");
+	}
+	else
+	{
+		 ftp_reply(sess, FTP_BADCMD, "Unknown SITE command.");
+	}
 }
 
 static void do_syst(session_t *sess)
@@ -969,7 +996,45 @@ static void do_size(session_t *sess)
 
 static void do_stat(session_t *sess)
 {
-    
+   	ftp_lreply(sess, FTP_STATOK, "FTP server status:");
+	if (sess->bw_upload_rate_max == 0)
+	{
+		char text[1024];
+		sprintf(text,
+			"     No session upload bandwidth limit\r\n");
+		writen(sess->ctrl_fd, text, strlen(text));
+	}
+	else if (sess->bw_upload_rate_max > 0)
+	{
+		char text[1024];
+		sprintf(text,
+			"     Session upload bandwidth limit in byte/s is %u\r\n",
+			sess->bw_upload_rate_max);
+		writen(sess->ctrl_fd, text, strlen(text));
+	}
+
+	if (sess->bw_download_rate_max == 0)
+	{
+		char text[1024];
+		sprintf(text,
+			"     No session download bandwidth limit\r\n");
+		writen(sess->ctrl_fd, text, strlen(text));
+	}
+	else if (sess->bw_download_rate_max > 0)
+	{
+		char text[1024];
+		sprintf(text,
+			"     Session download bandwidth limit in byte/s is %u\r\n",
+			sess->bw_download_rate_max);
+		writen(sess->ctrl_fd, text, strlen(text));
+	}
+
+	char text[1024] = {0};
+	sprintf(text,
+		"     At session startup, client count was %u\r\n",
+		sess->num_clients);
+	writen(sess->ctrl_fd, text, strlen(text));
+	ftp_reply(sess, FTP_STATOK, "End of status");
 }
 
 static void do_noop(session_t *sess)
@@ -979,5 +1044,66 @@ static void do_noop(session_t *sess)
 
 static void do_help(session_t *sess)
 {
+    ftp_lreply(sess, FTP_HELP, "The following commands are recognized.");
+	writen(sess->ctrl_fd,
+		" ABOR ACCT ALLO APPE CDUP CWD  DELE EPRT EPSV FEAT HELP LIST MDTM MKD\r\n",
+		strlen(" ABOR ACCT ALLO APPE CDUP CWD  DELE EPRT EPSV FEAT HELP LIST MDTM MKD\r\n"));
+	writen(sess->ctrl_fd,
+		" MODE NLST NOOP OPTS PASS PASV PORT PWD  QUIT REIN REST RETR RMD  RNFR\r\n",
+		strlen(" MODE NLST NOOP OPTS PASS PASV PORT PWD  QUIT REIN REST RETR RMD  RNFR\r\n"));
+	writen(sess->ctrl_fd,
+		" RNTO SITE SIZE SMNT STAT STOR STOU STRU SYST TYPE USER XCUP XCWD XMKD\r\n",
+		strlen(" RNTO SITE SIZE SMNT STAT STOR STOU STRU SYST TYPE USER XCUP XCWD XMKD\r\n"));
+	writen(sess->ctrl_fd,
+		" XPWD XRMD\r\n",
+		strlen(" XPWD XRMD\r\n"));
+	ftp_reply(sess, FTP_HELP, "Help OK.");
 }
 
+static void do_site_chmod(session_t *sess, char *chmod_arg)
+{
+	// SITE CHMOD <perm> <file>
+	if (strlen(chmod_arg) == 0)
+	{
+		ftp_reply(sess, FTP_BADCMD, "SITE CHMOD needs 2 arguments.");
+		return;
+	}
+
+	char perm[100] = {0};
+	char file[100] = {0};
+	str_split(chmod_arg , perm, file, ' ');
+	if (strlen(file) == 0)
+	{
+		ftp_reply(sess, FTP_BADCMD, "SITE CHMOD needs 2 arguments.");
+		return;
+	}
+
+	unsigned int mode = str_octal_to_uint(perm);
+	if (chmod(file, mode) < 0)
+	{
+		ftp_reply(sess, FTP_CHMODOK, "SITE CHMOD command failed.");
+	}
+	else
+	{
+		ftp_reply(sess, FTP_CHMODOK, "SITE CHMOD command ok.");
+	}
+}
+
+static void do_site_umask(session_t *sess, char *umask_arg)
+{
+	// SITE UMASK [umask]
+	if (strlen(umask_arg) == 0)
+	{
+		char text[1024] = {0};
+		sprintf(text, "Your current UMASK is 0%o", tunable_local_umask);
+		ftp_reply(sess, FTP_UMASKOK, text);
+	}
+	else
+	{
+		unsigned int um = str_octal_to_uint(umask_arg);
+		umask(um);
+		char text[1024] = {0};
+		sprintf(text, "UMASK set to 0%o", um);
+		ftp_reply(sess, FTP_UMASKOK, text);
+	}
+}

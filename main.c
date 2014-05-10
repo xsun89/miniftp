@@ -14,7 +14,7 @@ static hash_t *s_pid_ip_hash;
 
 void check_limits(session_t *sess);
 void handle_sigchld(int sig);
-void handle_ip_count(unsigned int *ip);
+unsigned int handle_ip_count(unsigned int *ip);
 unsigned int hash_func(unsigned int buckets, void *key);
 void drop_ip_count(void *ip);
 int main(void)
@@ -149,7 +149,7 @@ unsigned int handle_ip_count(unsigned int *ip)
     if(p_count == NULL)
     {
         count = 1;
-        hash_add_entry(s_ip_count_hash, ip, sizeof(unsigned int), count, sizeof(unsigned int));
+        hash_add_entry(s_ip_count_hash, ip, sizeof(unsigned int), &count, sizeof(unsigned int));
     }else
     {
         count = *p_count;
